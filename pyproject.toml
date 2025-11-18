@@ -5,10 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy",
+    "numpy>=1.24.0,<2.0",
     "polars",
     "tqdm",
     "scipy",
     "jupyterlab",
     "plotly",
+    "torch==2.0.1",
+    "torchvision>=0.15.0,<0.16.0",
+    "torchmetrics",
+    "lightning",
+    "wandb",
+    "altair",
+    "pyarrow",
 ]

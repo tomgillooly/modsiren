@@ -9,8 +9,6 @@ import lightning.pytorch as pl
 import wandb
 
 from torch.utils.data import DataLoader, DistributedSampler, RandomSampler, SequentialSampler
-from config_validity_dataset import get_config_indices, FlattenedImageNerfPointDataset, FlattenedImageNerfDataset, FlattenedImageLatentNerfDataset
-from config_validity_regularisers import vmf_regularizer, koleo_regularizer
 
 
 # %%
@@ -181,7 +179,7 @@ class ReLUMLP(nn.Sequential):
 class ModSiren(pl.LightningModule):
     """ModSiren model with PyTorch Lightning wrapper."""
 
-    def __init__(self, input_features=2, output_features=1,
+    def __init__(self, input_features=2, output_features=2,
                  hidden_layers=4, hidden_features=64,
                  first_layer_features=256,
                  mod_layers=4,
@@ -243,7 +241,7 @@ class ModSiren(pl.LightningModule):
         # h_mod = F.normalize(h_mod, dim=-1)
         
         # Synthesizer forward pass
-        h_synth = self.synthesizer.input(coords) * h_mod[:, None] #* h_mod_scale[:, None] + h_mod_shift[:, None]
+        h_synth = self.synthesizer.input(coords) * h_mod #* h_mod_scale + h_mod_shift
 
         if th.isnan(h_mod).any() or th.isnan(h_synth).any() or th.isinf(h_mod).any() or th.isinf(h_synth).any():
             raise ValueError("NaN or Inf detected in modulator or synthesizer outputs.")
@@ -257,19 +255,19 @@ class ModSiren(pl.LightningModule):
             h_mod = mod_layer(h_mod)
             # h_mod_scale, h_mod_shift = h_mod.chunk(2, dim=-1)
             # h_mod = F.normalize(h_mod, dim=-1)
-            h_synth = synth_layer(h_synth) * h_mod[:, None] # * h_mod_scale[:, None] + h_mod_shift[:, None]
+            h_synth = synth_layer(h_synth) * h_mod # * h_mod_scale + h_mod_shift
 
             if th.isnan(h_mod).any() or th.isnan(h_synth).any() or th.isinf(h_mod).any() or th.isinf(h_synth).any():
                 raise ValueError(f"NaN or Inf detected in modulator or synthesizer outputs at layer {i}.")
 
         for i in range(self.mod_layers-1, self.hidden_layers-1):
             synth_layer = getattr(self.synthesizer, f"hidden{i:02d}")
-            h_synth = synth_layer(h_synth) * h_mod[:, None] # * h_mod_scale[:, None] + h_mod_shift[:, None]
+            h_synth = synth_layer(h_synth) * h_mod # * h_mod_scale + h_mod_shift
             
         # Final output layer
-        out = self.synthesizer.output(h_synth) #* self.modulator.output(h_mod)[:, None]
+        out = self.synthesizer.output(h_synth) #* self.modulator.output(h_mod)
         
-        return out.squeeze(-1)
+        return out
     
     def on_train_epoch_start(self):
         cur_lr = self.trainer.optimizers[0].param_groups[0]['lr']
